@@ -6,27 +6,24 @@ set "-${-//[sc]/}eu${DEBUG:+xv}o" pipefail
 
 function prep(){
 
-  toolbox rm -f "${RELEASE}" || true
+  toolbox rm -f "${toolbox_name}" || true
 
   # pulling if image isn't local
   if [[ -n "${CONREG}" ]] ; then
     podman pull "${container_image}"
   fi
 
-  toolbox -y create -c "${RELEASE}" --image "${container_image}"
+  toolbox -y create -c "${toolbox_name}" --image "${container_image}"
 
 }
 
 function configure(){
 
   # can't do that with toolbox run yet, as we need to install sudo first
-  podman start "${RELEASE}"
-  podman exec -it "${RELEASE}" sh -exc '
+  podman start "${toolbox_name}"
+  podman exec -it "${toolbox_name}" sh -exc '
   # go-faster apt/dpkg
   echo force-unsafe-io > /etc/dpkg/dpkg.cfg.d/unsafe-io
-
-  # location based redirector gets it wrong with company VPN; also add deb-src
-  sed -i "s/deb.debian.org/ftp.de.debian.org/; /^deb\b/ { p; s/^deb/deb-src/ }" /etc/apt/sources.list
 
   apt-get update
   apt-get install -y libnss-myhostname sudo eatmydata libcap2-bin
@@ -36,7 +33,7 @@ function configure(){
   '
 
   # shellcheck disable=SC2016
-  toolbox run --container "${RELEASE}" sh -exc '
+  toolbox run --container "${toolbox_name}" sh -exc '
   # otherwise installing systemd fails
   sudo umount /var/log/journal
 
@@ -62,11 +59,12 @@ function main(){
   RELEASE="${2:-latest}"
   CONREG="${3-docker.io/}"
   container_image="${CONREG}${DISTRO}:${RELEASE}"
+  toolbox_name="${4:-${DISTRO}-${RELEASE}}"
 
   prep
   configure
 
-  toolbox enter --container "${RELEASE}"
+  toolbox enter --container "${toolbox_name}"
 
 }
 
