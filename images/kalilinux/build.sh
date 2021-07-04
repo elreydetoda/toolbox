@@ -105,6 +105,7 @@ function main(){
   wrapping_it_up
 
   buildah commit --format docker "${container_id}" "${toolbox_name}"
+  buildah rm "${container_id}"
 }
 
 # https://elrey.casa/bash/scripting/main
