@@ -25,7 +25,10 @@ function build_system(){
   # fixing sudo permission
   "${buildah_run_cmd[@]}" sed -i -e 's/ ALL$/ NOPASSWD:ALL/' /etc/sudoers
   "${buildah_run_cmd[@]}" bash -c "echo VARIANT_ID=container | tee -a /etc/os-release"
-  "${buildah_run_cmd[@]}" touch /etc/localtime
+  for filez in "${create_files[@]}" ; do
+    printf 'creating file: %s\n' "${filez}"
+    "${buildah_run_cmd[@]}" touch "${filez}"
+  done
 }
 
 function wrapping_it_up(){
@@ -69,14 +72,10 @@ function main(){
     "summary='Base image for creating kali linux ${toolbox_version} containers'"
     'maintainer="Alex R <toolbox-social-contact@elrey741.33mail.com>'
   )
+
+  # got packages from here:
+  # https://github.com/containers/toolbox/blob/a6d31c6cd22dc05987e21df8b9d50f403a4a47b8/images/ubuntu/19.04/extra-packages
   pkgs=(
-    # 'meson'
-    # 'go-md2man'
-    # 'systemd'
-    # 'go'
-    # 'ninja-build'
-    # got packages from here:
-    # https://github.com/containers/toolbox/blob/a6d31c6cd22dc05987e21df8b9d50f403a4a47b8/images/ubuntu/19.04/extra-packages
     'bash-completion'
     'git'
     'keyutils'
@@ -95,11 +94,21 @@ function main(){
     'wget'
     'zip'
   )
+  create_files=(
+    '/etc/machine-id'
+    '/etc/localtime'
+  )
   buildah_run_cmd=(
     'buildah' 'run'
   )
   prep_container
   buildah_run_cmd+=( "${container_id}" '--' )
+
+  printf 'building: %s\nversion: %s\n%s\n\n' \
+    "${container_image}" \
+    "$("${buildah_run_cmd[@]}" bash -c 'grep "^VERSION=" /etc/os-release | cut -d "\"" -f 2')" \
+    "$(buildah images --format="{{.ID}}" --no-trunc "${container_image}")"
+
   build_system
   cleanup
   wrapping_it_up
