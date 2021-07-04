@@ -1,47 +1,76 @@
-#!/bin/sh
-set -eux
+#!/bin/bash
 
-# found with this blog post:
-# https://base-art.net/Articles/setting-up-debian-containers-on-fedora-silverblue/
-RELEASE=${1:-sid}
-DISTRO=${2:-debian}
+# https://elrey.casa/bash/scripting/harden
+set "-${-//[sc]/}eu${DEBUG:+xv}o" pipefail
 
-toolbox rm -f $RELEASE || true
-podman pull docker.io/$DISTRO:$RELEASE
-toolbox -y create -c $RELEASE --image docker.io/$DISTRO:$RELEASE
 
-# can't do that with toolbox run yet, as we need to install sudo first
-podman start $RELEASE
-podman exec -it $RELEASE sh -exc '
-# go-faster apt/dpkg
-echo force-unsafe-io > /etc/dpkg/dpkg.cfg.d/unsafe-io
+function prep(){
 
-# location based redirector gets it wrong with company VPN; also add deb-src
-sed -i "s/deb.debian.org/ftp.de.debian.org/; /^deb\b/ { p; s/^deb/deb-src/ }" /etc/apt/sources.list
+  toolbox rm -f "${RELEASE}" || true
 
-apt-get update
-apt-get install -y libnss-myhostname sudo eatmydata libcap2-bin
+  # pulling if image isn't local
+  if [[ -n "${CONREG}" ]] ; then
+    podman pull "${container_image}"
+  fi
 
-# allow sudo with empty password
-sed -i "s/nullok_secure/nullok/" /etc/pam.d/common-auth
-'
+  toolbox -y create -c "${RELEASE}" --image "${container_image}"
 
-toolbox run --container $RELEASE sh -exc '
-# otherwise installing systemd fails
-sudo umount /var/log/journal
+}
 
-# useful hostname
-. /etc/os-release
-echo "${ID}-${VERSION_ID:-sid}" | sudo tee /etc/hostname
-sudo hostname -F /etc/hostname
+function configure(){
 
-sudo eatmydata apt-get -y dist-upgrade
+  # can't do that with toolbox run yet, as we need to install sudo first
+  podman start "${RELEASE}"
+  podman exec -it "${RELEASE}" sh -exc '
+  # go-faster apt/dpkg
+  echo force-unsafe-io > /etc/dpkg/dpkg.cfg.d/unsafe-io
 
-# development tools
-sudo eatmydata apt-get install -y --no-install-recommends build-essential git-buildpackage libwww-perl less vim lintian debhelper manpages-dev git dput pristine-tar bash-completion wget gnupg ubuntu-dev-tools python3-debian fakeroot libdistro-info-perl
+  # location based redirector gets it wrong with company VPN; also add deb-src
+  sed -i "s/deb.debian.org/ftp.de.debian.org/; /^deb\b/ { p; s/^deb/deb-src/ }" /etc/apt/sources.list
 
-# autopkgtest
-sudo eatmydata apt-get install -y --no-install-recommends autopkgtest qemu-system-x86 qemu-utils genisoimage
-'
+  apt-get update
+  apt-get install -y libnss-myhostname sudo eatmydata libcap2-bin
 
-toolbox enter --container $RELEASE
+  # allow sudo with empty password
+  sed -i "s/nullok_secure/nullok/" /etc/pam.d/common-auth
+  '
+
+  # shellcheck disable=SC2016
+  toolbox run --container "${RELEASE}" sh -exc '
+  # otherwise installing systemd fails
+  sudo umount /var/log/journal
+
+  # useful hostname
+  . /etc/os-release
+  echo "${ID}-${VERSION_ID:-sid}" | sudo tee /etc/hostname
+  sudo hostname -F /etc/hostname
+
+  sudo eatmydata apt-get -y dist-upgrade
+
+  # development tools
+  sudo eatmydata apt-get install -y --no-install-recommends build-essential git-buildpackage libwww-perl less vim lintian debhelper manpages-dev git dput pristine-tar bash-completion wget gnupg ubuntu-dev-tools python3-debian fakeroot libdistro-info-perl
+
+  # autopkgtest
+  sudo eatmydata apt-get install -y --no-install-recommends autopkgtest qemu-system-x86 qemu-utils genisoimage
+  '
+
+}
+
+
+function main(){
+  DISTRO="${1}"
+  RELEASE="${2:-latest}"
+  CONREG="${3-docker.io/}"
+  container_image="${CONREG}${DISTRO}:${RELEASE}"
+
+  prep
+  configure
+
+  toolbox enter --container "${RELEASE}"
+
+}
+
+# https://elrey.casa/bash/scripting/main
+if [[ "${0}" = "${BASH_SOURCE[0]:-bash}" ]] ; then
+  main "${@}"
+fi
