@@ -165,3 +165,13 @@ LABEL com.github.containers.toolbox="true"
 ```
 The label `com.github.debarshiray.toolbox="true"` was used in previous versions
 of toolbox but is currently deprecated.
+
+## Modifications
+
+Adding modifications based on [this blog post](https://base-art.net/Articles/setting-up-debian-containers-on-fedora-silverblue/).
+
+Images adding are:
+
+* Kali Linux
+* Ubuntu
+  * 20.04
