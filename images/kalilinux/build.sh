@@ -25,6 +25,7 @@ function build_system(){
   # fixing sudo permission
   "${buildah_run_cmd[@]}" sed -i -e 's/ ALL$/ NOPASSWD:ALL/' /etc/sudoers
   "${buildah_run_cmd[@]}" bash -c 'echo VARIANT_ID=container | tee -a /etc/os-release'
+  "${buildah_run_cmd[@]}" bash -c "echo 'Defaults !fqdn' | tee /etc/sudoers.d/ignore_fqdn"
   for filez in "${create_files[@]}" ; do
     printf 'creating file: %s\n' "${filez}"
     "${buildah_run_cmd[@]}" touch "${filez}"
